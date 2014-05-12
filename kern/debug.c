@@ -67,11 +67,50 @@ debug_warn(const char *file, int line, const char *fmt,...)
 	va_end(ap);
 }
 
-// Record the current call stack in eips[] by following the %ebp chain.
+// Riecord the current call stack in eips[] by following the %ebp chain.
 void gcc_noinline
 debug_trace(uint32_t ebp, uint32_t eips[DEBUG_TRACEFRAMES])
 {
-	panic("debug_trace not implemented");
+	uint32_t* ebp_addr;
+	uint32_t eip;
+
+	ebp_addr = (uint32_t*) ebp;
+
+	int x = 0;
+
+	cprintf("Stack backtrace:\n");
+
+	while(*ebp_addr >= 0)
+	{
+
+		eip = ebp_addr[1];
+		eips[x++] = eip;
+
+		cprintf("ebp 0x%08x eip 0x%08x", *ebp_addr, eip);
+
+		int y = 0;
+
+		cprintf(" args");
+
+		for(; y < 5; y++)
+		{
+			cprintf(" %08x", ebp_addr[2 + y]);
+		}
+
+		cprintf("\n");
+
+		if(*ebp_addr == 0)
+		{
+			for(; x < 10; x++)
+				eips[x] = 0;
+			break;
+		}
+
+		ebp_addr = (uint32_t*) (*ebp_addr);
+	}
+
+	return;
+	//panic("debug_trace not implemented");
 }
 
 
