@@ -28,13 +28,21 @@ static struct pseudodesc idt_pd = {
 	sizeof(idt) - 1, (uint32_t) idt
 };
 
+extern uint32_t vectors[];
 
 static void
 trap_init_idt(void)
 {
 	extern segdesc gdt[];
 	
-	panic("trap_init() not implemented.");
+	//panic("trap_init() not implemented.");
+	int i;
+
+	for(i = 0; i < 20; i++)
+	{
+		SETGATE(idt[i], 1, CPU_GDT_KCODE, vectors[i], 0);
+	}
+	SETGATE(idt[30], 1, CPU_GDT_KCODE, vectors[30], 0);
 }
 
 void
@@ -236,7 +244,7 @@ trap_check(void **argsp)
 
 	// Make sure our stack cookie is still with us
 	assert(cookie == 0xfeedface);
-
+	//cprintf("sfsfsfsfsfsfsfsfsf\n");
 	*argsp = NULL;	// recovery mechanism not needed anymore
 }
 

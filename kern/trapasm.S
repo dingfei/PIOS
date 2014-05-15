@@ -46,9 +46,76 @@
  * Lab 1: Your code here for generating entry points for the different traps.
  */
 
+TRAPHANDLER_NOEC(vector0, 0)
+TRAPHANDLER_NOEC(vector1, 1)
+TRAPHANDLER_NOEC(vector2, 2)
+TRAPHANDLER_NOEC(vector3, 3)
+TRAPHANDLER_NOEC(vector4, 4)
+TRAPHANDLER_NOEC(vector5, 5)
+TRAPHANDLER_NOEC(vector6, 6)
+TRAPHANDLER_NOEC(vector7, 7)
+TRAPHANDLER(vector8, 8)
+TRAPHANDLER_NOEC(vector9, 9)
+TRAPHANDLER(vector10, 10)
+TRAPHANDLER(vector11, 11)
+TRAPHANDLER(vector12, 12)
+TRAPHANDLER(vector13, 13)
+TRAPHANDLER(vector14, 14)
+TRAPHANDLER_NOEC(vector15, 15)
+TRAPHANDLER_NOEC(vector16, 16)
+TRAPHANDLER(vector17, 17)
+TRAPHANDLER_NOEC(vector18, 18)
+TRAPHANDLER_NOEC(vector19, 19)
+TRAPHANDLER_NOEC(vector30, 30)
+
+# vector table
+.data
+.globl vectors
+vectors:
+	.long vector0
+	.long vector1
+	.long vector2
+	.long vector3
+	.long vector4
+	.long vector5
+	.long vector6
+	.long vector7
+	.long vector8
+	.long vector9
+	.long vector10
+	.long vector11
+	.long vector12
+	.long vector13
+	.long vector14
+	.long vector15
+	.long vector16
+	.long vector17
+	.long vector18
+	.long vector19
+	.long vector30
+	
 /*
  * Lab 1: Your code here for _alltraps
  */
+
+.globl _alltraps
+_alltraps:
+	# builde the frame.
+	pushl %ds
+	pushl %es
+	pushl %fs
+	pushl %gs
+	pushal
+
+	# set up data 
+	movw $(CPU_GDT_KDATA), %ax
+	movw %ax, %ds
+	movw %ax, %es
+	
+	# call trap(tf), where tf = %esp
+	pushl %esp
+	call trap
+	addl $4, %esp	
 
 
 
@@ -69,5 +136,21 @@ trap_return:
 /*
  * Lab 1: Your code here for trap_return
  */
+
+add $4, %esp
+movl (%esp), %esp
+
+popal
+
+popl %gs
+popl %fs
+popl %es
+popl %ds
+
+addl $0x8, %esp
+iret
+
 1:	jmp	1b		// just spin
+
+
 
