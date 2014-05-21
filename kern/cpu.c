@@ -64,7 +64,7 @@ void cpu_init()
 
 	c->tss.ts_ss0 = CPU_GDT_KDATA;
 	c->tss.ts_esp0 = (uintptr_t)c->kstackhi; 
-	c->gdt[CPU_GDT_TSS>>3] = SEGDESC16(0, STS_T16A, (uintptr_t)(&c->tss), sizeof(c->tss) - 1, 0);
+	c->gdt[CPU_GDT_TSS>>3] = SEGDESC16(0, STS_T32A, (uintptr_t)(&c->tss), sizeof(c->tss) - 1, 0);
 
 
 	// Load the GDT
@@ -73,7 +73,7 @@ void cpu_init()
 	asm volatile("lgdt %0" : : "m" (gdt_pd));
 
 	ltr(CPU_GDT_TSS);
-
+	
 	// Reload all segment registers.
 	//asm volatile("movw %%ax,%%gs" :: "a" (CPU_GDT_UDATA|3));
 	//asm volatile("movw %%ax,%%fs" :: "a" (CPU_GDT_UDATA|3));

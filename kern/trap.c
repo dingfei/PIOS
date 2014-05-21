@@ -40,9 +40,9 @@ trap_init_idt(void)
 
 	for(i = 0; i < 20; i++)
 	{
-		SETGATE(idt[i], 1, CPU_GDT_KCODE, vectors[i], 0);
+		SETGATE(idt[i], 1, CPU_GDT_KCODE, vectors[i], 3);
 	}
-	SETGATE(idt[30], 1, CPU_GDT_KCODE, vectors[30], 0);
+	SETGATE(idt[30], 1, CPU_GDT_KCODE, vectors[30], 3);
 }
 
 void
