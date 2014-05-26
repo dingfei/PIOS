@@ -26,6 +26,8 @@ pageinfo *mem_pageinfo;		// Metadata array indexed by page number
 
 pageinfo *mem_freelist;		// Start of free page list
 
+pageinfo spc_for_pi[1024*1024*1024/PAGESIZE];
+
 
 void mem_check(void);
 
@@ -79,11 +81,28 @@ mem_init(void)
 	//     Hint: the linker places the kernel (see start and end above),
 	//     but YOU decide where to place the pageinfo array.
 	// Change the code to reflect this.
+
+
+	extern char start[], end[];
+	uint32_t page_start;
+	
 	pageinfo **freetail = &mem_freelist;
+	memset(spc_for_pi, 0, sizeof(pageinfo)*1024*1024*1024/PAGESIZE);
+	mem_pageinfo = spc_for_pi;
 	int i;
 	for (i = 0; i < mem_npage; i++) {
 		// A free page has no references to it.
 		mem_pageinfo[i].refcount = 0;
+
+		if(i == 0 || i == 1)
+			continue;
+
+		page_start = mem_pi2phys(mem_pageinfo + i);
+
+		if((page_start + PAGESIZE  >= MEM_IO && page_start < MEM_EXT)
+			|| (page_start + PAGESIZE >= (uint32_t)start && page_start < (uint32_t)end))
+			continue;
+
 
 		// Add the page to the end of the free list.
 		*freetail = &mem_pageinfo[i];
@@ -92,7 +111,7 @@ mem_init(void)
 	*freetail = NULL;	// null-terminate the freelist
 
 	// ...and remove this when you're ready.
-	panic("mem_init() not implemented");
+	//panic("mem_init() not implemented");
 
 	// Check to make sure the page allocator seems to work correctly.
 	mem_check();
@@ -114,7 +133,13 @@ mem_alloc(void)
 {
 	// Fill this function in
 	// Fill this function in.
-	panic("mem_alloc not implemented.");
+	//panic("mem_alloc not implemented.");
+
+	if(mem_freelist == NULL)
+		return NULL;
+	pageinfo* r = mem_freelist;
+	mem_freelist = mem_freelist->free_next;
+	return r;
 }
 
 //
@@ -125,7 +150,14 @@ void
 mem_free(pageinfo *pi)
 {
 	// Fill this function in.
-	panic("mem_free not implemented.");
+	//panic("mem_free not implemented.");
+
+	if(pi == NULL)
+		panic("null for page which to be freed!"); 
+
+	pi->free_next = mem_freelist;
+	mem_freelist = pi;
+	
 }
 
 //
