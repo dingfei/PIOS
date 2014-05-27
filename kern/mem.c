@@ -29,6 +29,9 @@ pageinfo *mem_freelist;		// Start of free page list
 
 pageinfo spc_for_pi[1024*1024*1024/PAGESIZE];
 
+spinlock mem_spinlock;
+
+
 
 void mem_check(void);
 
@@ -37,6 +40,9 @@ mem_init(void)
 {
 	if (!cpu_onboot())	// only do once, on the boot CPU
 		return;
+
+	
+	spinlock_init(&mem_spinlock);
 
 	// Determine how much base (<640K) and extended (>1MB) memory
 	// is available in the system (in bytes),
@@ -129,6 +135,10 @@ mem_init(void)
 //
 // Hint: pi->refs should not be incremented 
 // Hint: be sure to use proper mutual exclusion for multiprocessor operation.
+
+
+
+
 pageinfo *
 mem_alloc(void)
 {
@@ -138,8 +148,11 @@ mem_alloc(void)
 
 	if(mem_freelist == NULL)
 		return NULL;
+
+	spinlock_acquire(&mem_spinlock);
 	pageinfo* r = mem_freelist;
 	mem_freelist = mem_freelist->free_next;
+	spinlock_release(&mem_spinlock);
 	return r;
 }
 
@@ -156,8 +169,10 @@ mem_free(pageinfo *pi)
 	if(pi == NULL)
 		panic("null for page which to be freed!"); 
 
+	spinlock_acquire(&mem_spinlock);
 	pi->free_next = mem_freelist;
 	mem_freelist = pi;
+	spinlock_release(&mem_spinlock);
 	
 }
 
