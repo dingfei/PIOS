@@ -88,7 +88,7 @@ init(void)
 
 	cprintf("before tt\n");
 
-	trapframe tt = {
+	/*trapframe tt = {
 		cs: CPU_GDT_UCODE | 3,
 		eip: (uint32_t)(user),
 		eflags: FL_IOPL_3,
@@ -102,6 +102,23 @@ init(void)
 	};
 	
 	trap_return(&tt);
+	*/
+
+	cprintf("before alloc proc_root\n");
+	proc_root = proc_alloc(&proc_null, 1);
+	proc_root->sv.tf.eip = (uint32_t)(user);
+	proc_root->sv.tf.esp = (uint32_t)&user_stack[PAGESIZE];
+	proc_root->sv.tf.eflags = FL_IOPL_3;
+	proc_root->sv.tf.gs = CPU_GDT_UDATA | 3;
+	proc_root->sv.tf.fs = CPU_GDT_UDATA | 3;
+
+	cprintf("before proc_ready\n");
+	proc_ready(proc_root);
+	
+	cprintf("before proc_sched\n");
+	proc_sched();
+
+
 	
 	//user();
 }

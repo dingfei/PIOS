@@ -47,6 +47,14 @@ typedef struct proc {
 	procstate	sv;
 } proc;
 
+
+typedef struct ready_queue {
+	spinlock lock;
+	uint32_t count;
+	proc* head;
+	proc* tail;
+}ready_queue;
+
 #define proc_cur()	(cpu_cur()->proc)
 
 

@@ -1,7 +1,7 @@
 trap_check_kernel() succeeded!
 kernel warning at kern/mem.c:56: Assuming we have 1GB of memory!
 Physical memory: 1048576K available, base = 640K, extended = 1047552K
-mem_check: 261519 free pages
+mem_check: 261517 free pages
 mem_check() succeeded!
 0
 1
@@ -55,26 +55,13 @@ mem_check() succeeded!
 9
 spinlock_check() succeeded!
 before tt
-TRAP frame at 0x106fb4
-  edi  0x00000000
-  esi  0x00000000
-  ebp  0x0010848c
-  ebx  0x001084b4
-  edx  0x001084b4
-  ecx  0x0000000a
-  eax  0x00000000
-  es   0x----0023
-  ds   0x----0023
-  trap 0x0000000d General Protection
-  err  0x00000182
-  eip  0x001003cf
-  cs   0x----001b
-  flag 0x00003006
-  esp  0x00108464
-  ss   0x----0023
-kernel panic at kern/trap.c:150: unhandled trap
-  from 00101799
-  from 00107079
-  from 0010467e
-  from 001046a7
-  from 00100181
+before alloc proc_root
+before proc_ready
+before proc_sched
+in user()
+spawning child 0
+kernel panic at kern/trap.c:147: unhandler system call
+
+  from 00101843
+  from 001090e9
+  from 0010022f
