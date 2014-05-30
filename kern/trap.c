@@ -144,7 +144,7 @@ trap(trapframe *tf)
 	// Lab 2: your trap handling code here!
 	if(tf->trapno == T_SYSCALL){
 		syscall(tf);
-		panic("unhandler system call\n");
+		//panic("unhandler system call\n");
 	}
 	// If we panic while holding the console lock,
 	// release it so we don't get into a recursive panic that way.

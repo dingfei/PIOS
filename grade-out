@@ -60,8 +60,14 @@ before proc_ready
 before proc_sched
 in user()
 spawning child 0
-kernel panic at kern/trap.c:147: unhandler system call
-
-  from 00101843
-  from 001090e9
-  from 0010022f
+spawning child 1
+spawning child 2
+spawning child 3
+waiting for child 0
+waiting for child 1
+proc_check() 2-child test succeeded
+proc_check: spawning 4 children
+spawning child 0
+spawning child 1
+spawning child 2
+spawning child 3

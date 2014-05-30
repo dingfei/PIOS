@@ -87,6 +87,81 @@ do_cputs(trapframe *tf, uint32_t cmd)
 	trap_return(tf);	// syscall completed
 }
 
+
+static void
+do_put(trapframe *tf, uint32_t cmd)
+{	
+	procstate* ps = (procstate*)tf->regs.ebx;
+	uint16_t child_num = tf->regs.edx;
+	proc* proc_parent = proc_cur();
+	proc* proc_child = proc_parent->child[child_num];
+
+	if(proc_child == NULL){
+		proc_child = proc_alloc(proc_parent, child_num);
+		if(proc_child == NULL)
+			panic("no child proc!");
+	}
+
+	if(proc_child->state != PROC_STOP){
+		spinlock_acquire(&(proc_parent->lock));
+		proc_parent->state = PROC_WAIT;
+		spinlock_release(&(proc_parent->lock));
+		proc_save(proc_parent, tf, 0);
+	}
+
+	//cprintf("1");
+
+	if(tf->regs.eax & SYS_REGS){	
+		//cprintf("2");
+		if(((proc_child->sv.tf.eflags ^ ps->tf.eflags) | FL_USER) != FL_USER)
+			panic("illegal modification of eflags!");
+
+		spinlock_acquire(&proc_child->lock);
+		proc_child->sv.tf.eflags = ps->tf.eflags;
+		spinlock_release(&proc_child->lock);
+
+		if(proc_child->sv.tf.cs != (CPU_GDT_UCODE | 3)
+			|| proc_child->sv.tf.ds != (CPU_GDT_UDATA | 3)
+			|| proc_child->sv.tf.es != (CPU_GDT_UDATA | 3)
+			|| proc_child->sv.tf.ss != (CPU_GDT_UDATA | 3))
+			panic("wrong segment regs values!");
+	}
+	else if(tf->regs.eax & SYS_START){
+		if(proc_child->state != PROC_STOP){
+			proc_wait(proc_parent, proc_child, tf);
+		}
+		proc_ready(proc_child);
+	}
+	
+	trap_return(tf);
+}
+
+static void
+do_get(trapframe *tf, uint32_t cmd)
+{	
+	procstate* ps = (procstate*)tf->regs.ebx;
+	uint16_t child_num = tf->regs.edx;
+	proc* proc_parent = proc_cur();
+	proc* proc_child = proc_parent->child[child_num];
+
+	if(proc_child->state != PROC_STOP)
+		proc_wait(proc_parent, proc_child, tf);
+
+	if((cmd & SYS_TYPE) == SYS_REGS){
+		memcpy(&ps->tf, &(proc_child->sv.tf), sizeof(struct trapframe));
+	}
+
+	trap_return(tf);
+}
+
+static void
+do_ret(trapframe *tf, uint32_t cmd)
+{	
+	proc_ret(tf, 1);
+}
+
+
+
 // Common function to handle all system calls -
 // decode the system call type and call an appropriate handler function.
 // Be sure to handle undefined system calls appropriately.
@@ -96,7 +171,11 @@ syscall(trapframe *tf)
 	// EAX register holds system call command/flags
 	uint32_t cmd = tf->regs.eax;
 	switch (cmd & SYS_TYPE) {
-	case SYS_CPUTS:	return do_cputs(tf, cmd);
+	case SYS_CPUTS:	 do_cputs(tf, cmd); break;
+	case SYS_PUT:	 do_put(tf, cmd); break;
+	case SYS_GET:	 do_get(tf, cmd); break;
+	case SYS_RET:	 do_ret(tf, cmd); break;
+	
 	// Your implementations of SYS_PUT, SYS_GET, SYS_RET here...
 	default:	return;		// handle as a regular trap
 	}

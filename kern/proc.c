@@ -132,11 +132,17 @@ proc_wait(proc *p, proc *cp, trapframe *tf)
 	if(cp == NULL)
 		panic("no child proc!");
 	
-	p->waitchild = cp;
-	cp->parent = p;
+	spinlock_acquire(&p->lock);
 	p->state = PROC_WAIT;
+	p->waitchild = cp;
+	spinlock_release(&p->lock);
+
 	proc_save(p, tf, 0);
-	proc_run(cp);
+	
+	while(cp->state != PROC_STOP)
+		;
+	proc_sched();
+	
 }
 
 void gcc_noreturn
@@ -224,9 +230,21 @@ proc_yield(trapframe *tf)
 void gcc_noreturn
 proc_ret(trapframe *tf, int entry)
 {
-	panic("proc_ret not implemented");
+	//panic("proc_ret not implemented");
 
-	
+	proc* proc_child = proc_cur();
+	proc* proc_parent = proc_child->parent;
+
+	spinlock_acquire(&proc_child->lock);
+	proc_child->state = PROC_STOP;
+	spinlock_release(&proc_child->lock);
+
+	proc_save(proc_child, tf, entry);
+
+	if((proc_parent->state == PROC_WAIT) && (proc_parent->waitchild == proc_child) )
+		proc_ready(proc_parent);
+
+	proc_sched();
 }
 
 // Helper functions for proc_check()
