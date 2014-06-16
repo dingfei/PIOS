@@ -28,6 +28,7 @@ typedef struct spinlock {
 	int line;		// Line number of spinlock_init()
 	struct cpu *cpu;	// The cpu holding the lock.
 	uint32_t eips[DEBUG_TRACEFRAMES]; // Call stack that locked the lock.
+	
 } spinlock;
 
 #define spinlock_init(lk)	spinlock_init_(lk, __FILE__, __LINE__)
@@ -38,5 +39,6 @@ void spinlock_acquire(spinlock *lk);
 void spinlock_release(spinlock *lk);
 int spinlock_holding(spinlock *lk);
 void spinlock_check();
+
 
 #endif /* !PIOS_KERN_SPINLOCK_H */

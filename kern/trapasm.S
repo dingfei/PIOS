@@ -95,6 +95,7 @@ TRAPHANDLER_NOEC(vector45, 45)
 TRAPHANDLER_NOEC(vector46, 46)
 TRAPHANDLER_NOEC(vector47, 47)
 TRAPHANDLER_NOEC(vector48, 48)
+TRAPHANDLER_NOEC(vector49, 49)
 
 
 # vector table
@@ -150,6 +151,7 @@ vectors:
 	.long vector46
 	.long vector47
 	.long vector48
+	.long vector49
 
 	
 	
@@ -207,6 +209,7 @@ popl %es
 popl %ds
 
 addl $0x8, %esp
+sti
 iret
 
 1:	jmp	1b		// just spin

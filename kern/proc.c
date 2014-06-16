@@ -17,7 +17,6 @@
 #include <kern/init.h>
 
 
-
 proc proc_null;		// null process - just leave it initialized to 0
 
 proc *proc_root;	// root process, once it's created in init()
@@ -26,20 +25,41 @@ proc *proc_root;	// root process, once it's created in init()
 
 ready_queue queue;
 
+static int count;
+
+
+
+void
+proc_print(TYPE ty, proc* p)
+{
+	if(ty == ACQUIRE)
+		cprintf("acquire lock ");
+	else
+		cprintf("release lock ");
+	if(p != NULL)
+		cprintf("on cpu %d, process %d\n", cpu_cur()->id, p->num);
+	else
+		cprintf("on cpu %d\n", cpu_cur()->id);
+}
+
+
+
 void
 proc_init(void)
 {
+	
 	if (!cpu_onboot())
 		return;
+	
+	//cprintf("in proc_init, current cpu:%d\n", cpu_cur()->id);
 
 	spinlock_init(&queue.lock);
 
-	//spinlock_acquire(&queue->lock);
 	queue.count= 0;
 	queue.head = NULL;
 	queue.tail= NULL;
-	//spinlock_release(&queue->lock);
-
+	
+	
 	// your module initialization code here
 }
 
@@ -48,6 +68,9 @@ proc_init(void)
 proc *
 proc_alloc(proc *p, uint32_t cn)
 {
+
+	//cprintf("in proc_alloc\n");
+	
 	pageinfo *pi = mem_alloc();
 	if (!pi)
 		return NULL;
@@ -55,9 +78,12 @@ proc_alloc(proc *p, uint32_t cn)
 
 	proc *cp = (proc*)mem_pi2ptr(pi);
 	memset(cp, 0, sizeof(proc));
+
 	spinlock_init(&cp->lock);
 	cp->parent = p;
 	cp->state = PROC_STOP;
+
+	cp->num = count++;
 
 	// Integer register state
 	cp->sv.tf.ds = CPU_GDT_UDATA | 3;
@@ -65,6 +91,7 @@ proc_alloc(proc *p, uint32_t cn)
 	cp->sv.tf.cs = CPU_GDT_UCODE | 3;
 	cp->sv.tf.ss = CPU_GDT_UDATA | 3;
 
+	//cp->sv.tf.eflags = FL_IF;
 
 	if (p)
 		p->child[cn] = cp;
@@ -76,30 +103,42 @@ void
 proc_ready(proc *p)
 {
 	//panic("proc_ready not implemented");
+
 	if(p == NULL)
 		panic("proc_ready's p is null!");
+	
+	assert(p->state != PROC_READY);
 
+	//proc_print(ACQUIRE, p);
 	spinlock_acquire(&p->lock);
 	p->state = PROC_READY;
 
 	spinlock_acquire(&queue.lock);
 	// if there is no proc in queue now
 	if(queue.count == 0){
-		queue.count = 1;
+		//cprintf("in ready = 0\n");
+		queue.count++;
 		queue.head = p;
 		queue.tail = p;
-		spinlock_release(&queue.lock);
-		spinlock_release(&p->lock);	
-		return;
+		//spinlock_release(&queue.lock);
+		//proc_print(RELEASE, p);
+		//spinlock_release(&p->lock);	
 	}
 
 	// insert it to the head of the queue
-	p->readynext = queue.head;
-	queue.head = p;
-	queue.count++;
+	else{
+		//cprintf("in ready != 0\n");
+		p->readynext = queue.head;
+		queue.head = p;
+		queue.count += 1;
 
-	spinlock_release(&queue.lock);
+		//spinlock_release(&queue.lock);
+		//proc_print(RELEASE, p);
+		//spinlock_release(&p->lock);
+	}
+
 	spinlock_release(&p->lock);
+	spinlock_release(&queue.lock);
 	return;
 	
 }
@@ -114,8 +153,23 @@ proc_ready(proc *p)
 void
 proc_save(proc *p, trapframe *tf, int entry)
 {
+	//proc_print(ACQUIRE, p);
 	spinlock_acquire(&p->lock);
-	memcpy(&p->sv.tf, &tf, sizeof(struct trapframe));
+
+	switch(entry){
+		case -1:		
+			memmove(&(p->sv.tf), tf, sizeof(trapframe));
+			break;
+		case 0:
+			tf->eip = (uintptr_t)((char*)tf->eip - 2);
+		case 1:
+			memmove(&(p->sv.tf), tf, sizeof(trapframe));
+			break;
+		default:
+			panic("wrong entry!\n");
+	}
+
+	//proc_print(RELEASE, p);
 	spinlock_release(&p->lock);
 }
 
@@ -131,16 +185,18 @@ proc_wait(proc *p, proc *cp, trapframe *tf)
 		panic("parent proc is not running!");
 	if(cp == NULL)
 		panic("no child proc!");
-	
+
+	//proc_print(ACQUIRE, p);
 	spinlock_acquire(&p->lock);
 	p->state = PROC_WAIT;
 	p->waitchild = cp;
+	//proc_print(RELEASE, p);
 	spinlock_release(&p->lock);
-
-	proc_save(p, tf, 0);
 	
-	while(cp->state != PROC_STOP)
-		;
+	proc_save(p, tf, 0);
+
+	assert(cp->state != PROC_STOP);
+	
 	proc_sched();
 	
 }
@@ -150,40 +206,59 @@ proc_sched(void)
 {
 	//panic("proc_sched not implemented");
 
+	cprintf("cpu: %d, queue has %d elements\n", cpu_cur()->id, queue.count);
+	
 	for(;;){
+
+		//cprintf("proc_sched on cpu %d\n", cpu_cur()->id);
+		
 		proc* run;
 		//proc* before = cpu_cur()->proc;
 			
 		// if there is no ready process in queue
 		// just wait
 
+		//proc_print(ACQUIRE, NULL);
 		spinlock_acquire(&queue.lock);
-		
-		while(queue.count == 0){
-			pause();
-		}	
-	
-		// if there is just one ready process
-		if(queue.count == 1){
-			run = queue.head;
-			queue.head = queue.tail = NULL;
-			queue.count = 0;
+
+		if(queue.count != 0){
+			// if there is just one ready process
+			if(queue.count == 1){
+				//cprintf("in sched queue.count == 1\n");
+				run = queue.head;
+				queue.head = queue.tail = NULL;
+				queue.count = 0;	
+			}
+			
+			// if there is more than one ready processes
+			else{
+				cprintf("in sched queue.count > 1\n");
+				proc* before_tail = queue.head;
+				while(before_tail->readynext != queue.tail){
+					before_tail = before_tail->readynext;
+				}	
+				run = queue.tail;
+				queue.tail = before_tail;
+				queue.count--;				
+			}
+
+			/*else{
+				//cprintf("in sched queue.count > 1\n");
+				run = queue.head;
+				queue.head = queue.head->readynext;
+				queue.count--;
+			}*/
+			
+			spinlock_release(&queue.lock);
+			proc_run(run);
 		}
-		
-		// if there is more than one ready processes
 		else{
-			proc* before_tail = queue.head;
-			while(before_tail->readynext != queue.tail){
-				before_tail = before_tail->readynext;
-			}	
-			run = queue.tail;
-			queue.tail = before_tail;
-			queue.count--;
+			//cprintf("proc_sched queue.count = 0 on cpu %d\n", cpu_cur()->id);
+			pause();
 		}
-		
+
+		//proc_print(RELEASE, NULL);
 		spinlock_release(&queue.lock);
-	
-		proc_run(run);
 	}
 	
 }
@@ -194,9 +269,14 @@ proc_run(proc *p)
 {
 	//panic("proc_run not implemented");
 
+	//cprintf("proc %d is running on cpu:%d\n", p->num, cpu_cur()->id);
+	
 	if(p == NULL)
 		panic("proc_run's p is null!");
 
+	assert(p->state == PROC_READY);
+
+	//proc_print(ACQUIRE, p);
 	spinlock_acquire(&p->lock);
 
 	cpu* c = cpu_cur();
@@ -204,7 +284,10 @@ proc_run(proc *p)
 	p->state = PROC_RUN;
 	p->runcpu = c;
 
+	//proc_print(RELEASE, p);
 	spinlock_release(&p->lock);
+
+	cprintf("eip = %d\n", p->sv.tf.eip);
 	
 	trap_return(&p->sv.tf);
 	
@@ -217,8 +300,9 @@ proc_yield(trapframe *tf)
 {
 	//panic("proc_yield not implemented");
 
+ 	cprintf("in yield\n");
 	proc* cur_proc = cpu_cur()->proc;
-	proc_save(cur_proc, tf, 0);
+	proc_save(cur_proc, tf, 1);
 	proc_ready(cur_proc);
 	proc_sched();
 }
@@ -235,8 +319,12 @@ proc_ret(trapframe *tf, int entry)
 	proc* proc_child = proc_cur();
 	proc* proc_parent = proc_child->parent;
 
+	assert(proc_child->state != PROC_STOP);
+
+	//proc_print(ACQUIRE, proc_child);
 	spinlock_acquire(&proc_child->lock);
 	proc_child->state = PROC_STOP;
+	//proc_print(RELEASE, proc_child);
 	spinlock_release(&proc_child->lock);
 
 	proc_save(proc_child, tf, entry);
@@ -274,8 +362,12 @@ proc_check(void)
 		// Use PUT syscall to create each child,
 		// but only start the first 2 children for now.
 		cprintf("spawning child %d\n", i);
+
 		sys_put(SYS_REGS | (i < 2 ? SYS_START : 0), i, &child_state,
 			NULL, NULL, 0);
+		
+		cprintf("i == %d complete!\n", i);
+		
 	}
 
 	// Wait for both children to complete.
@@ -296,6 +388,7 @@ proc_check(void)
 		sys_put(SYS_START, i, NULL, NULL, NULL, 0);
 	}
 
+	cprintf("Wait for all 4 children to complete.\n");
 	// Wait for all 4 children to complete.
 	for (i = 0; i < 4; i++)
 		sys_get(0, i, NULL, NULL, NULL, 0);
@@ -330,15 +423,21 @@ proc_check(void)
 
 static void child(int n)
 {
+	//cprintf("in child()s\n");
 	// Only first 2 children participate in first pingpong test
 	if (n < 2) {
 		int i;
 		for (i = 0; i < 10; i++) {
 			cprintf("in child %d count %d\n", n, i);
-			while (pingpong != n)
+			while (pingpong != n){
+				cprintf("in pingpong = %d\n", pingpong);
 				pause();
+			}
 			xchg(&pingpong, !pingpong);
 		}
+
+		//cprintf("before sys_ret!/n");
+		//cprintf("in pingpong = %d\n", pingpong);
 		sys_ret();
 	}
 
@@ -346,8 +445,10 @@ static void child(int n)
 	int i;
 	for (i = 0; i < 10; i++) {
 		cprintf("in child %d count %d\n", n, i);
-		while (pingpong != n)
+		while (pingpong != n){
+			cprintf("in pingpong = %d\n", pingpong);
 			pause();
+		}
 		xchg(&pingpong, (pingpong + 1) % 4);
 	}
 	sys_ret();

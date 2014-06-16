@@ -35,11 +35,14 @@ spinlock_acquire(struct spinlock *lk)
 {
 	//cprintf("in sa\n");
 
-	if(spinlock_holding(lk))
+	if(spinlock_holding(lk)){
+		//cprintf("acquire\n");
+		//cprintf("file = %s, line = %d, cpu = %d\n", lk->file, lk->line, lk->cpu->id);
 		panic("acquire");
+	}
 
 	while(xchg(&lk->locked, 1) !=0)
-		{cprintf("in xchg\n")
+		{//cprintf("in xchg\n")
 		;}
 
 	lk->cpu = cpu_cur();
@@ -49,6 +52,8 @@ spinlock_acquire(struct spinlock *lk)
 	//cprintf("after dt\n");
 
 	//cprintf("after sa\n");
+
+	//cprintf("acquire lock num: %d on cpu: %d\n", lk->number, lk->cpu->id);
 }
 
 // Release the lock.
@@ -63,6 +68,8 @@ spinlock_release(struct spinlock *lk)
 	xchg(&lk->locked, 0);
 
 	lk->eips[0] = 0;
+
+	//cprintf("release lock num: %d on cpu: %d\n", lk->number, lk->cpu->id);
 }
 
 // Check whether this cpu is holding the lock.

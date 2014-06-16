@@ -46,8 +46,9 @@ trap_init_idt(void)
 	{
 		SETGATE(idt[i], 1, CPU_GDT_KCODE, vectors[i], 3);
 	}
-	SETGATE(idt[30], 1, CPU_GDT_KCODE, vectors[30], 3);
+	SETGATE(idt[T_SECEV], 1, CPU_GDT_KCODE, vectors[T_SECEV], 3);
 	SETGATE(idt[T_SYSCALL], 1, CPU_GDT_KCODE, vectors[T_SYSCALL], 3);
+	SETGATE(idt[T_LTIMER], 1, CPU_GDT_KCODE, vectors[T_LTIMER], 3);
 }
 
 void
@@ -136,6 +137,8 @@ trap(trapframe *tf)
 	// and some versions of GCC rely on DF being clear.
 	asm volatile("cld" ::: "cc");
 
+	cli();
+
 	// If this trap was anticipated, just use the designated handler.
 	cpu *c = cpu_cur();
 	if (c->recover)
@@ -146,6 +149,24 @@ trap(trapframe *tf)
 		syscall(tf);
 		//panic("unhandler system call\n");
 	}
+
+    
+	switch(tf->trapno){
+		//cprintf("in switch\n");
+		case T_LTIMER:
+			//cprintf("in T_LTIMER\n");
+			lapic_eoi();
+			//cprintf("before yield\n");
+			proc_yield(tf);
+			break;
+		case T_IRQ0 + IRQ_SPURIOUS:
+			panic(" IRQ_SPURIOUS ");
+
+		default:
+			proc_ret(tf, -1);
+	}
+
+			
 	// If we panic while holding the console lock,
 	// release it so we don't get into a recursive panic that way.
 	if (spinlock_holding(&cons_lock))

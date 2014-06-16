@@ -101,35 +101,41 @@ do_put(trapframe *tf, uint32_t cmd)
 		if(proc_child == NULL)
 			panic("no child proc!");
 	}
-
+	
+	//proc_print(ACQUIRE, proc_child);
+	spinlock_acquire(&proc_child->lock);
 	if(proc_child->state != PROC_STOP){
-		spinlock_acquire(&(proc_parent->lock));
-		proc_parent->state = PROC_WAIT;
-		spinlock_release(&(proc_parent->lock));
-		proc_save(proc_parent, tf, 0);
+		//proc_print(RELEASE, proc_child);
+		spinlock_release(&proc_child->lock);
+		proc_wait(proc_parent, proc_child, tf);
 	}
 
-	//cprintf("1");
+	//proc_print(RELEASE, proc_child);
+	spinlock_release(&proc_child->lock);
 
 	if(tf->regs.eax & SYS_REGS){	
-		//cprintf("2");
+		//proc_print(ACQUIRE, proc_child);
+		spinlock_acquire(&proc_child->lock);
+		
 		if(((proc_child->sv.tf.eflags ^ ps->tf.eflags) | FL_USER) != FL_USER)
 			panic("illegal modification of eflags!");
 
-		spinlock_acquire(&proc_child->lock);
-		proc_child->sv.tf.eflags = ps->tf.eflags;
-		spinlock_release(&proc_child->lock);
+		
+		proc_child->sv.tf.eip = ps->tf.eip;
+		proc_child->sv.tf.esp = ps->tf.esp;
+		
 
 		if(proc_child->sv.tf.cs != (CPU_GDT_UCODE | 3)
 			|| proc_child->sv.tf.ds != (CPU_GDT_UDATA | 3)
 			|| proc_child->sv.tf.es != (CPU_GDT_UDATA | 3)
 			|| proc_child->sv.tf.ss != (CPU_GDT_UDATA | 3))
 			panic("wrong segment regs values!");
+
+		//proc_print(RELEASE, proc_child);
+		spinlock_release(&proc_child->lock);
 	}
-	else if(tf->regs.eax & SYS_START){
-		if(proc_child->state != PROC_STOP){
-			proc_wait(proc_parent, proc_child, tf);
-		}
+    if(tf->regs.eax & SYS_START){
+		cprintf("in SYS_START\n");
 		proc_ready(proc_child);
 	}
 	
@@ -139,18 +145,22 @@ do_put(trapframe *tf, uint32_t cmd)
 static void
 do_get(trapframe *tf, uint32_t cmd)
 {	
+	cprintf("in do_get()\n");
 	procstate* ps = (procstate*)tf->regs.ebx;
-	uint16_t child_num = tf->regs.edx;
+	int child_num = (int)tf->regs.edx;
 	proc* proc_parent = proc_cur();
 	proc* proc_child = proc_parent->child[child_num];
 
-	if(proc_child->state != PROC_STOP)
-		proc_wait(proc_parent, proc_child, tf);
+	assert(proc_child != NULL);
 
-	if((cmd & SYS_TYPE) == SYS_REGS){
-		memcpy(&ps->tf, &(proc_child->sv.tf), sizeof(struct trapframe));
+	if(proc_child->state != PROC_STOP){
+		cprintf("into proc_wait\n");
+		proc_wait(proc_parent, proc_child, tf);}
+
+	if(tf->regs.eax & SYS_REGS){
+		memmove(&(ps->tf), &(proc_child->sv.tf), sizeof(trapframe));
 	}
-
+	
 	trap_return(tf);
 }
 

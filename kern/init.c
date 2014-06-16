@@ -53,13 +53,16 @@ init(void)
 	// ensuring that all static/global variables start out zero.
 	if (cpu_onboot())
 		memset(edata, 0, end - edata);
+	//cprintf("1\n");
 
 	// Initialize the console.
 	// Can't call cprintf until after we do this!
 	cons_init();
 
 	// Initialize and load the bootstrap CPU's GDT, TSS, and IDT.
+	//cprintf("1\n");
 	cpu_init();
+	//cprintf("1\n");
 	trap_init();
 
 	// Physical memory detection/initialization.
@@ -75,18 +78,19 @@ init(void)
 	pic_init();		// setup the legacy PIC (mainly to disable it)
 	ioapic_init();		// prepare to handle external device interrupts
 	lapic_init();		// setup this CPU's local APIC
-	cpu_bootothers();	// Get other processors started
-//	cprintf("CPU %d (%s) has booted\n", cpu_cur()->id,
-//		cpu_onboot() ? "BP" : "AP");
-
-	// Initialize the process management code.
+		// Initialize the process management code.
 	proc_init();
+	cpu_bootothers();	// Get other processors started
+	cprintf("CPU %d (%s) has booted\n", cpu_cur()->id,
+		cpu_onboot() ? "BP" : "AP");
+
+
 
 	// Lab 1: change this so it enters user() in user mode,
 	// running on the user_stack declared above,
 	// instead of just calling user() directly.
 
-	cprintf("before tt\n");
+	//cprintf("before tt\n");
 
 	/*trapframe tt = {
 		cs: CPU_GDT_UCODE | 3,
@@ -104,22 +108,20 @@ init(void)
 	trap_return(&tt);
 	*/
 
-	cprintf("before alloc proc_root\n");
-	proc_root = proc_alloc(&proc_null, 1);
-	proc_root->sv.tf.eip = (uint32_t)(user);
-	proc_root->sv.tf.esp = (uint32_t)&user_stack[PAGESIZE];
-	proc_root->sv.tf.eflags = FL_IOPL_3;
-	proc_root->sv.tf.gs = CPU_GDT_UDATA | 3;
-	proc_root->sv.tf.fs = CPU_GDT_UDATA | 3;
+	if(cpu_onboot()){
+		proc_root = proc_alloc(&proc_null, 0);
+		proc_root->sv.tf.eip = (uint32_t)(user);
+		proc_root->sv.tf.esp = (uint32_t)&user_stack[PAGESIZE];
+		proc_root->sv.tf.eflags = FL_IF;
+		proc_root->sv.tf.gs = CPU_GDT_UDATA | 3;
+		proc_root->sv.tf.fs = CPU_GDT_UDATA | 3;
 
-	cprintf("before proc_ready\n");
-	proc_ready(proc_root);
+		proc_ready(proc_root);	
+	}
+
 	
-	cprintf("before proc_sched\n");
 	proc_sched();
 
-
-	
 	//user();
 }
 

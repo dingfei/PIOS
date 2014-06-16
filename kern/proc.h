@@ -33,6 +33,9 @@ typedef struct proc {
 	// Master spinlock protecting proc's state.
 	spinlock	lock;
 
+	// 
+	int num;
+
 	// Process hierarchy information.
 	struct proc	*parent;
 	struct proc	*child[PROC_CHILDREN];
@@ -45,12 +48,14 @@ typedef struct proc {
 
 	// Save area for user-visible state when process is not running.
 	procstate	sv;
+
+	
 } proc;
 
 
 typedef struct ready_queue {
 	spinlock lock;
-	uint32_t count;
+	int count;
 	proc* head;
 	proc* tail;
 }ready_queue;
@@ -64,7 +69,13 @@ extern proc proc_null;
 // Special root process - the only one that can do direct external I/O.
 extern proc *proc_root;
 
+typedef enum TYPE{
+	ACQUIRE = 0,
+	RELEASE,
+}TYPE;
 
+
+void proc_print(TYPE ty, proc* p);
 void proc_init(void);	// Initialize process management code
 proc *proc_alloc(proc *p, uint32_t cn);	// Allocate new child
 void proc_ready(proc *p);	// Make process p ready
