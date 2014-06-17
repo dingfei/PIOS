@@ -91,7 +91,7 @@ proc_alloc(proc *p, uint32_t cn)
 	cp->sv.tf.cs = CPU_GDT_UCODE | 3;
 	cp->sv.tf.ss = CPU_GDT_UDATA | 3;
 
-	//cp->sv.tf.eflags = FL_IF;
+	cp->sv.tf.eflags = FL_IF;
 
 	if (p)
 		p->child[cn] = cp;
@@ -104,6 +104,7 @@ proc_ready(proc *p)
 {
 	//panic("proc_ready not implemented");
 
+ 	//cprintf("in ready, child num:%d\n", queue.count);
 	if(p == NULL)
 		panic("proc_ready's p is null!");
 	
@@ -112,7 +113,6 @@ proc_ready(proc *p)
 	//proc_print(ACQUIRE, p);
 	spinlock_acquire(&p->lock);
 	p->state = PROC_READY;
-
 	spinlock_acquire(&queue.lock);
 	// if there is no proc in queue now
 	if(queue.count == 0){
@@ -206,7 +206,7 @@ proc_sched(void)
 {
 	//panic("proc_sched not implemented");
 
-	cprintf("cpu: %d, queue has %d elements\n", cpu_cur()->id, queue.count);
+	//cprintf("cpu: %d, queue has %d elements\n", cpu_cur()->id, queue.count);
 	
 	for(;;){
 
@@ -230,9 +230,10 @@ proc_sched(void)
 				queue.count = 0;	
 			}
 			
+			
 			// if there is more than one ready processes
 			else{
-				cprintf("in sched queue.count > 1\n");
+				//cprintf("in sched queue.count > 1\n");
 				proc* before_tail = queue.head;
 				while(before_tail->readynext != queue.tail){
 					before_tail = before_tail->readynext;
@@ -241,24 +242,22 @@ proc_sched(void)
 				queue.tail = before_tail;
 				queue.count--;				
 			}
-
-			/*else{
+			
+			/*
+			else{
 				//cprintf("in sched queue.count > 1\n");
 				run = queue.head;
 				queue.head = queue.head->readynext;
 				queue.count--;
-			}*/
+			}
+			*/
 			
+	
 			spinlock_release(&queue.lock);
 			proc_run(run);
 		}
-		else{
-			//cprintf("proc_sched queue.count = 0 on cpu %d\n", cpu_cur()->id);
-			pause();
-		}
-
-		//proc_print(RELEASE, NULL);
 		spinlock_release(&queue.lock);
+		pause();
 	}
 	
 }
@@ -269,7 +268,7 @@ proc_run(proc *p)
 {
 	//panic("proc_run not implemented");
 
-	//cprintf("proc %d is running on cpu:%d\n", p->num, cpu_cur()->id);
+	//cprintf("proc %x is running on cpu:%d\n", p, cpu_cur()->id);
 	
 	if(p == NULL)
 		panic("proc_run's p is null!");
@@ -287,7 +286,7 @@ proc_run(proc *p)
 	//proc_print(RELEASE, p);
 	spinlock_release(&p->lock);
 
-	cprintf("eip = %d\n", p->sv.tf.eip);
+	//cprintf("eip = %d\n", p->sv.tf.eip);
 	
 	trap_return(&p->sv.tf);
 	
@@ -300,7 +299,7 @@ proc_yield(trapframe *tf)
 {
 	//panic("proc_yield not implemented");
 
- 	cprintf("in yield\n");
+ 	//cprintf("in yield\n");
 	proc* cur_proc = cpu_cur()->proc;
 	proc_save(cur_proc, tf, 1);
 	proc_ready(cur_proc);
@@ -401,15 +400,23 @@ proc_check(void)
 	sys_get(SYS_REGS, i, &child_state, NULL, NULL, 0);
 		// get child 0's state
 	assert(recovargs == NULL);
+	cprintf("============== tag 1 \n");
 	do {
 		sys_put(SYS_REGS | SYS_START, i, &child_state, NULL, NULL, 0);
+		//cprintf("(1). child_state.tf.trapno = %d\n", child_state.tf.trapno);
 		sys_get(SYS_REGS, i, &child_state, NULL, NULL, 0);
+		//cprintf("(2). child_state.tf.trapno = %d\n", child_state.tf.trapno);
+		cprintf("recovargs 0x%x\n",recovargs);
+		
 		if (recovargs) {	// trap recovery needed
-			trap_check_args *args = recovargs;
+			cprintf("i = %d\n", i);
+			trap_check_args *argss = recovargs;
 			cprintf("recover from trap %d\n",
 				child_state.tf.trapno);
-			child_state.tf.eip = (uint32_t) args->reip;
-			args->trapno = child_state.tf.trapno;
+			child_state.tf.eip = (uint32_t) argss->reip;
+			argss->trapno = child_state.tf.trapno;
+			//cprintf(">>>>>args->trapno = %d, child_state.tf.trapno = %d\n", 
+			//	args->trapno, child_state.tf.trapno);
 		} else
 			assert(child_state.tf.trapno == T_SYSCALL);
 		i = (i+1) % 4;	// rotate to next child proc
@@ -430,7 +437,7 @@ static void child(int n)
 		for (i = 0; i < 10; i++) {
 			cprintf("in child %d count %d\n", n, i);
 			while (pingpong != n){
-				cprintf("in pingpong = %d\n", pingpong);
+				//cprintf("in pingpong = %d\n", pingpong);
 				pause();
 			}
 			xchg(&pingpong, !pingpong);
@@ -444,9 +451,11 @@ static void child(int n)
 	// Second test, round-robin pingpong between all 4 children
 	int i;
 	for (i = 0; i < 10; i++) {
-		cprintf("in child %d count %d\n", n, i);
+		//cprintf("in child %d count %d\n", n, i);
+		cprintf("child num:%d\n", queue.count);
+		
 		while (pingpong != n){
-			cprintf("in pingpong = %d\n", pingpong);
+			//cprintf("in pingpong = %d\n", pingpong);
 			pause();
 		}
 		xchg(&pingpong, (pingpong + 1) % 4);
@@ -454,6 +463,8 @@ static void child(int n)
 	sys_ret();
 
 	// Only "child 0" (or the proc that thinks it's child 0), trap check...
+
+	cprintf("child get last test\n");
 	if (n == 0) {
 		assert(recovargs == NULL);
 		trap_check(&recovargs);

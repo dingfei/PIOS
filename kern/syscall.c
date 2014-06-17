@@ -91,6 +91,8 @@ do_cputs(trapframe *tf, uint32_t cmd)
 static void
 do_put(trapframe *tf, uint32_t cmd)
 {	
+	cprintf("process %p is in do_put()\n", proc_cur());
+	
 	procstate* ps = (procstate*)tf->regs.ebx;
 	uint16_t child_num = tf->regs.edx;
 	proc* proc_parent = proc_cur();
@@ -116,14 +118,17 @@ do_put(trapframe *tf, uint32_t cmd)
 	if(tf->regs.eax & SYS_REGS){	
 		//proc_print(ACQUIRE, proc_child);
 		spinlock_acquire(&proc_child->lock);
-		
+
+		/*
 		if(((proc_child->sv.tf.eflags ^ ps->tf.eflags) | FL_USER) != FL_USER)
 			panic("illegal modification of eflags!");
-
+		*/
 		
 		proc_child->sv.tf.eip = ps->tf.eip;
 		proc_child->sv.tf.esp = ps->tf.esp;
-		
+		proc_child->sv.tf.regs.ebp=  ps->tf.regs.ebp;
+		cprintf(">>>>>>>>>>in do_put : esp : 0x%x\n",ps->tf.esp);
+		proc_child->sv.tf.trapno = ps->tf.trapno;
 
 		if(proc_child->sv.tf.cs != (CPU_GDT_UCODE | 3)
 			|| proc_child->sv.tf.ds != (CPU_GDT_UDATA | 3)
@@ -135,7 +140,7 @@ do_put(trapframe *tf, uint32_t cmd)
 		spinlock_release(&proc_child->lock);
 	}
     if(tf->regs.eax & SYS_START){
-		cprintf("in SYS_START\n");
+		//cprintf("in SYS_START\n");
 		proc_ready(proc_child);
 	}
 	
@@ -145,7 +150,8 @@ do_put(trapframe *tf, uint32_t cmd)
 static void
 do_get(trapframe *tf, uint32_t cmd)
 {	
-	cprintf("in do_get()\n");
+	cprintf("process %p is in do_get()\n", proc_cur());
+	
 	procstate* ps = (procstate*)tf->regs.ebx;
 	int child_num = (int)tf->regs.edx;
 	proc* proc_parent = proc_cur();
@@ -167,6 +173,7 @@ do_get(trapframe *tf, uint32_t cmd)
 static void
 do_ret(trapframe *tf, uint32_t cmd)
 {	
+	cprintf("process %p is in do_ret()\n", proc_cur());
 	proc_ret(tf, 1);
 }
 

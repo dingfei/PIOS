@@ -112,6 +112,7 @@ init(void)
 		proc_root = proc_alloc(&proc_null, 0);
 		proc_root->sv.tf.eip = (uint32_t)(user);
 		proc_root->sv.tf.esp = (uint32_t)&user_stack[PAGESIZE];
+		//proc_root->sv.tf.eflags = FL_IOPL_3;
 		proc_root->sv.tf.eflags = FL_IF;
 		proc_root->sv.tf.gs = CPU_GDT_UDATA | 3;
 		proc_root->sv.tf.fs = CPU_GDT_UDATA | 3;

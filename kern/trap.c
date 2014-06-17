@@ -139,10 +139,13 @@ trap(trapframe *tf)
 
 	cli();
 
+	//cprintf("process %p is in trap(), trapno == %d\n", proc_cur(), tf->trapno);
+
 	// If this trap was anticipated, just use the designated handler.
 	cpu *c = cpu_cur();
-	if (c->recover)
-		c->recover(tf, c->recoverdata);
+	if (c->recover){
+		//cprintf("before c->recover()\n");
+		c->recover(tf, c->recoverdata);}
 
 	// Lab 2: your trap handling code here!
 	if(tf->trapno == T_SYSCALL){
@@ -152,11 +155,9 @@ trap(trapframe *tf)
 
     
 	switch(tf->trapno){
-		//cprintf("in switch\n");
 		case T_LTIMER:
-			//cprintf("in T_LTIMER\n");
+			//cprintf("T_LTIMER proc: 0x%x\n",proc_cur());
 			lapic_eoi();
-			//cprintf("before yield\n");
 			proc_yield(tf);
 			break;
 		case T_IRQ0 + IRQ_SPURIOUS:
@@ -236,11 +237,14 @@ trap_check(void **argsp)
 	*argsp = (void*)&args;	// provide args needed for trap recovery
 
 	// Try a divide by zero trap.
-	// Be careful when using && to take the address of a label:
+	// Be careful when using && to take the address or a label:
 	// some versions of GCC (4.4.2 at least) will incorrectly try to
 	// eliminate code it thinks is _only_ reachable via such a pointer.
 	args.reip = after_div0;
+	cprintf("1. &args.trapno == %x\n", &args);
+	cprintf(">>>>>>>>>>in trap_check : esp : 0x%x\n",read_esp());
 	asm volatile("div %0,%0; after_div0:" : : "r" (0));
+	cprintf("2. &args.trapno == %x\n", &args);
 	assert(args.trapno == T_DIVIDE);
 
 	// Make sure we got our correct stack back with us.
