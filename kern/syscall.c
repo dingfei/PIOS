@@ -87,6 +87,98 @@ do_cputs(trapframe *tf, uint32_t cmd)
 	trap_return(tf);	// syscall completed
 }
 
+
+static void
+do_put(trapframe *tf, uint32_t cmd)
+{	
+	cprintf("process %p is in do_put()\n", proc_cur());
+	
+	procstate* ps = (procstate*)tf->regs.ebx;
+	uint16_t child_num = tf->regs.edx;
+	proc* proc_parent = proc_cur();
+	proc* proc_child = proc_parent->child[child_num];
+
+	if(proc_child == NULL){
+		proc_child = proc_alloc(proc_parent, child_num);
+		if(proc_child == NULL)
+			panic("no child proc!");
+	}
+	
+	//proc_print(ACQUIRE, proc_child);
+	spinlock_acquire(&proc_child->lock);
+	if(proc_child->state != PROC_STOP){
+		//proc_print(RELEASE, proc_child);
+		spinlock_release(&proc_child->lock);
+		proc_wait(proc_parent, proc_child, tf);
+	}
+
+	//proc_print(RELEASE, proc_child);
+	spinlock_release(&proc_child->lock);
+
+	if(tf->regs.eax & SYS_REGS){	
+		//proc_print(ACQUIRE, proc_child);
+		spinlock_acquire(&proc_child->lock);
+
+		/*
+		if(((proc_child->sv.tf.eflags ^ ps->tf.eflags) | FL_USER) != FL_USER)
+			panic("illegal modification of eflags!");
+		*/
+		
+		proc_child->sv.tf.eip = ps->tf.eip;
+		proc_child->sv.tf.esp = ps->tf.esp;
+		proc_child->sv.tf.regs.ebp=  ps->tf.regs.ebp;
+		cprintf(">>>>>>>>>>in do_put : esp : 0x%x\n",ps->tf.esp);
+		proc_child->sv.tf.trapno = ps->tf.trapno;
+
+		if(proc_child->sv.tf.cs != (CPU_GDT_UCODE | 3)
+			|| proc_child->sv.tf.ds != (CPU_GDT_UDATA | 3)
+			|| proc_child->sv.tf.es != (CPU_GDT_UDATA | 3)
+			|| proc_child->sv.tf.ss != (CPU_GDT_UDATA | 3))
+			panic("wrong segment regs values!");
+
+		//proc_print(RELEASE, proc_child);
+		spinlock_release(&proc_child->lock);
+	}
+    if(tf->regs.eax & SYS_START){
+		//cprintf("in SYS_START\n");
+		proc_ready(proc_child);
+	}
+	
+	trap_return(tf);
+}
+
+static void
+do_get(trapframe *tf, uint32_t cmd)
+{	
+	cprintf("process %p is in do_get()\n", proc_cur());
+	
+	procstate* ps = (procstate*)tf->regs.ebx;
+	int child_num = (int)tf->regs.edx;
+	proc* proc_parent = proc_cur();
+	proc* proc_child = proc_parent->child[child_num];
+
+	assert(proc_child != NULL);
+
+	if(proc_child->state != PROC_STOP){
+		cprintf("into proc_wait\n");
+		proc_wait(proc_parent, proc_child, tf);}
+
+	if(tf->regs.eax & SYS_REGS){
+		memmove(&(ps->tf), &(proc_child->sv.tf), sizeof(trapframe));
+	}
+	
+	trap_return(tf);
+}
+
+static void
+do_ret(trapframe *tf, uint32_t cmd)
+{	
+	cprintf("process %p is in do_ret()\n", proc_cur());
+	proc_ret(tf, 1);
+}
+
+
+
 // Common function to handle all system calls -
 // decode the system call type and call an appropriate handler function.
 // Be sure to handle undefined system calls appropriately.
@@ -96,7 +188,11 @@ syscall(trapframe *tf)
 	// EAX register holds system call command/flags
 	uint32_t cmd = tf->regs.eax;
 	switch (cmd & SYS_TYPE) {
-	case SYS_CPUTS:	return do_cputs(tf, cmd);
+	case SYS_CPUTS:	 do_cputs(tf, cmd); break;
+	case SYS_PUT:	 do_put(tf, cmd); break;
+	case SYS_GET:	 do_get(tf, cmd); break;
+	case SYS_RET:	 do_ret(tf, cmd); break;
+	
 	// Your implementations of SYS_PUT, SYS_GET, SYS_RET here...
 	default:	return;		// handle as a regular trap
 	}

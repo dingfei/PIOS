@@ -19,6 +19,11 @@
 void
 spinlock_init_(struct spinlock *lk, const char *file, int line)
 {
+	lk->locked = 0;
+	lk->file = file;
+	lk->line = line;
+	lk->cpu = NULL;
+	lk->eips[0] = 0;
 }
 
 // Acquire the lock.
@@ -28,19 +33,51 @@ spinlock_init_(struct spinlock *lk, const char *file, int line)
 void
 spinlock_acquire(struct spinlock *lk)
 {
+	//cprintf("in sa\n");
+
+	if(spinlock_holding(lk)){
+		//cprintf("acquire\n");
+		//cprintf("file = %s, line = %d, cpu = %d\n", lk->file, lk->line, lk->cpu->id);
+		panic("acquire");
+	}
+
+	while(xchg(&lk->locked, 1) !=0)
+		{//cprintf("in xchg\n")
+		;}
+
+	lk->cpu = cpu_cur();
+
+	//cprintf("before dt\n");
+	debug_trace(read_ebp(), lk->eips);
+	//cprintf("after dt\n");
+
+	//cprintf("after sa\n");
+
+	//cprintf("acquire lock num: %d on cpu: %d\n", lk->number, lk->cpu->id);
 }
 
 // Release the lock.
 void
 spinlock_release(struct spinlock *lk)
 {
+	if(!spinlock_holding(lk))
+		panic("release");
+
+	lk->cpu = NULL;
+
+	xchg(&lk->locked, 0);
+
+	lk->eips[0] = 0;
+
+	//cprintf("release lock num: %d on cpu: %d\n", lk->number, lk->cpu->id);
 }
 
 // Check whether this cpu is holding the lock.
 int
 spinlock_holding(spinlock *lock)
 {
-	panic("spinlock_holding() not implemented");
+	return (lock->cpu == cpu_cur()) && (lock->locked);
+	//panic("spinlock_holding() not implemented");
 }
 
 // Function that simply recurses to a specified depth.
@@ -52,6 +89,8 @@ spinlock_godeep(volatile int depth, spinlock* lk)
 	if (depth==0) { spinlock_acquire(lk); return 1; }
 	else return spinlock_godeep(depth-1, lk) * depth;
 }
+
+
 
 void spinlock_check()
 {
@@ -72,7 +111,10 @@ void spinlock_check()
 	{
 		// Lock all locks
 		for(i=0;i<NUMLOCKS;i++)
+		{
+			cprintf("%d\n", i);
 			spinlock_godeep(i, &locks[i]);
+		}
 
 		// Make sure that all locks have the right CPU
 		for(i=0;i<NUMLOCKS;i++)

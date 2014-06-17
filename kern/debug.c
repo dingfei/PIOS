@@ -68,11 +68,71 @@ debug_warn(const char *file, int line, const char *fmt,...)
 	va_end(ap);
 }
 
-// Record the current call stack in eips[] by following the %ebp chain.
+// Riecord the current call stack in eips[] by following the %ebp chain.
 void gcc_noinline
 debug_trace(uint32_t ebp, uint32_t eips[DEBUG_TRACEFRAMES])
 {
-	panic("debug_trace not implemented");
+	/*uint32_t* ebp_addr;
+	uint32_t eip;
+
+	ebp_addr = (uint32_t*) ebp;
+
+	int x = 0;
+
+	cprintf("Stack backtrace:\n");
+
+	while(*ebp_addr >= 0)
+	{
+
+		eip = ebp_addr[1];
+		eips[x++] = eip;
+
+		//cprintf("ebp 0x%08x eip 0x%08x", *ebp_addr, eip);
+
+		int y = 0;
+
+		//cprintf(" args");
+
+		for(; y < 5; y++)
+		{
+			cprintf(" %08x", ebp_addr[2 + y]);
+		}
+
+		//cprintf("\n");
+
+		if(*ebp_addr == 0)
+		{
+			for(; x < 10; x++)
+				eips[x] = 0;
+			break;
+		}
+		
+
+		ebp_addr = (uint32_t*) (*ebp_addr);
+				
+	}
+
+	return;*/
+	//panic("debug_trace not implemented");
+
+	int i ,j;
+	uint32_t *cur_epb = (uint32_t *)ebp;
+	//cprintf("Stack backtrace:\n");
+	for(i = 0; i < DEBUG_TRACEFRAMES && cur_epb > 0; i++) {
+		//cprintf("  ebp %08x eip %08x args",cur_epb[0],cur_epb[1]);
+		eips[i] = cur_epb[1];
+		for(j = 0; j < 5; j++) {
+			//makecprintf(" %08x",cur_epb[2 + j]);
+		}
+		//cprintf("\n");make
+		cur_epb = (uint32_t *)(*cur_epb);
+	}
+	for(; i < DEBUG_TRACEFRAMES ; i++) {
+		eips[i] = 0;
+	}
+	/*
+	for(i = 0; i < DEBUG_TRACEFRAMES ; i++) {
+		cprintf("eip %x\n",eips[i]);			}*/
 }
 
 

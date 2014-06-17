@@ -1,0 +1,238 @@
+1. &args.trapno == 107f6c
+>>>>>>>>>>in trap_check : esp : 0x107f50
+2. &args.trapno == 107f6c
+trap_check_kernel() succeeded!
+kernel warning at kern/mem.c:56: Assuming we have 1GB of memory!
+Physical memory: 1048576K available, base = 640K, extended = 1047552K
+mem_check: 261518 free pages
+mem_check() succeeded!
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+spinlock_check() succeeded!
+CPU 0 (BP) has booted
+in user()
+spawning child 0
+process 0x2000 is in do_put()
+>>>>>>>>>>in do_put : esp : 0x10b328
+in child 0 count 0
+in child 0 count 1
+i == 0 complete!
+spawning child 1
+process 0x2000 is in do_put()
+>>>>>>>>>>in do_put : esp : 0x10c328
+i == 1 complete!
+spawning child 2
+in child 1 count 0
+in child 1 count 1
+process 0x2000 is in do_put()
+>>>>>>>>>>in do_put : esp : 0x10d328
+i == 2 complete!
+spawning child 3
+process 0x2000 is in do_put()
+>>>>>>>>>>in do_put : esp : 0x10e328
+in child 0 count 2
+in child 1 count 2
+i == 3 complete!
+waiting for child 0
+process 0x2000 is in do_get()
+into proc_wait
+in child 0 count 3
+in child 1 count 3
+in child 0 count 4
+in child 1 count 4
+in child 0 count 5
+in child 1 count 5
+in child 0 count 6
+in child 1 count 6
+in child 0 count 7
+in child 1 count 7
+in child 0 count 8
+in child 1 count 8
+in child 0 count 9
+in child 1 count 9
+process 0x3000 is in do_ret()
+process 0x4000 is in do_ret()
+process 0x2000 is in do_get()
+waiting for child 1
+process 0x2000 is in do_get()
+proc_check() 2-child test succeeded
+proc_check: spawning 4 children
+spawning child 0
+process 0x2000 is in do_put()
+spawning child 1
+process 0x2000 is in do_put()
+spawning child 2
+process 0x2000 is in do_put()
+spawning child 3
+process 0x2000 is in do_put()
+Wait for all 4 children to complete.
+process 0x2000 is in do_get()
+into proc_wait
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+child num:3
+process 0x3000 is in do_ret()
+process 0x4000 is in do_ret()
+process 0x5000 is in do_ret()
+process 0x6000 is in do_ret()
+process 0x2000 is in do_get()
+process 0x2000 is in do_get()
+process 0x2000 is in do_get()
+process 0x2000 is in do_get()
+proc_check() 4-child test succeeded
+process 0x2000 is in do_get()
+============== tag 1 
+process 0x2000 is in do_put()
+>>>>>>>>>>in do_put : esp : 0x10b2fc
+process 0x2000 is in do_get()
+into proc_wait
+child get last test
+1. &args.trapno == 10b2c8
+>>>>>>>>>>in trap_check : esp : 0x10b2ac
+process 0x2000 is in do_get()
+recovargs 0x10b2c8
+i = 0
+recover from trap 0
+process 0x2000 is in do_put()
+>>>>>>>>>>in do_put : esp : 0x10b2ac
+process 0x2000 is in do_get()
+into proc_wait
+2. &args.trapno == 10b2c8
+process 0x2000 is in do_get()
+recovargs 0x10b2c8
+i = 1
+recover from trap 3
+process 0x2000 is in do_put()
+>>>>>>>>>>in do_put : esp : 0x10b2ac
+process 0x2000 is in do_get()
+into proc_wait
+process 0x2000 is in do_get()
+recovargs 0x10b2c8
+i = 2
+recover from trap 4
+process 0x2000 is in do_put()
+>>>>>>>>>>in do_put : esp : 0x10b2ac
+process 0x2000 is in do_get()
+into proc_wait
+process 0x2000 is in do_get()
+recovargs 0x10b2c8
+i = 3
+recover from trap 5
+process 0x2000 is in do_put()
+>>>>>>>>>>in do_put : esp : 0x10b2ac
+process 0x2000 is in do_get()
+into proc_wait
+process 0x2000 is in do_get()
+recovargs 0x10b2c8
+i = 0
+recover from trap 6
+process 0x2000 is in do_put()
+>>>>>>>>>>in do_put : esp : 0x10b2ac
+process 0x2000 is in do_get()
+into proc_wait
+process 0x2000 is in do_get()
+recovargs 0x10b2c8
+i = 1
+recover from trap 13
+process 0x2000 is in do_put()
+>>>>>>>>>>in do_put : esp : 0x10b2ac
+process 0x2000 is in do_get()
+into proc_wait
+process 0x2000 is in do_get()
+recovargs 0x10b2c8
+i = 2
+recover from trap 13
+process 0x2000 is in do_put()
+>>>>>>>>>>in do_put : esp : 0x10b2ac
+process 0x2000 is in do_get()
+into proc_wait
+process 0x6000 is in do_ret()
+process 0x2000 is in do_get()
+recovargs 0x0
+proc_check() trap reflection test succeeded
+proc_check() succeeded!

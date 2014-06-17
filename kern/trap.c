@@ -33,13 +33,23 @@ static struct pseudodesc idt_pd = {
 	sizeof(idt) - 1, (uint32_t) idt
 };
 
+extern uint32_t vectors[];
 
 static void
 trap_init_idt(void)
 {
 	extern segdesc gdt[];
 	
-	panic("trap_init() not implemented.");
+	//panic("trap_init() not implemented.");
+	int i;
+
+	for(i = 0; i < 20; i++)
+	{
+		SETGATE(idt[i], 1, CPU_GDT_KCODE, vectors[i], 3);
+	}
+	SETGATE(idt[T_SECEV], 1, CPU_GDT_KCODE, vectors[T_SECEV], 3);
+	SETGATE(idt[T_SYSCALL], 1, CPU_GDT_KCODE, vectors[T_SYSCALL], 3);
+	SETGATE(idt[T_LTIMER], 1, CPU_GDT_KCODE, vectors[T_LTIMER], 3);
 }
 
 void
@@ -128,13 +138,37 @@ trap(trapframe *tf)
 	// and some versions of GCC rely on DF being clear.
 	asm volatile("cld" ::: "cc");
 
+	cli();
+
+	//cprintf("process %p is in trap(), trapno == %d\n", proc_cur(), tf->trapno);
+
 	// If this trap was anticipated, just use the designated handler.
 	cpu *c = cpu_cur();
-	if (c->recover)
-		c->recover(tf, c->recoverdata);
+	if (c->recover){
+		//cprintf("before c->recover()\n");
+		c->recover(tf, c->recoverdata);}
 
 	// Lab 2: your trap handling code here!
+	if(tf->trapno == T_SYSCALL){
+		syscall(tf);
+		//panic("unhandler system call\n");
+	}
 
+    
+	switch(tf->trapno){
+		case T_LTIMER:
+			//cprintf("T_LTIMER proc: 0x%x\n",proc_cur());
+			lapic_eoi();
+			proc_yield(tf);
+			break;
+		case T_IRQ0 + IRQ_SPURIOUS:
+			panic(" IRQ_SPURIOUS ");
+
+		default:
+			proc_ret(tf, -1);
+	}
+
+			
 	// If we panic while holding the console lock,
 	// release it so we don't get into a recursive panic that way.
 	if (spinlock_holding(&cons_lock))
@@ -204,11 +238,14 @@ trap_check(void **argsp)
 	*argsp = (void*)&args;	// provide args needed for trap recovery
 
 	// Try a divide by zero trap.
-	// Be careful when using && to take the address of a label:
+	// Be careful when using && to take the address or a label:
 	// some versions of GCC (4.4.2 at least) will incorrectly try to
 	// eliminate code it thinks is _only_ reachable via such a pointer.
 	args.reip = after_div0;
+	cprintf("1. &args.trapno == %x\n", &args);
+	cprintf(">>>>>>>>>>in trap_check : esp : 0x%x\n",read_esp());
 	asm volatile("div %0,%0; after_div0:" : : "r" (0));
+	cprintf("2. &args.trapno == %x\n", &args);
 	assert(args.trapno == T_DIVIDE);
 
 	// Make sure we got our correct stack back with us.
@@ -251,7 +288,7 @@ trap_check(void **argsp)
 
 	// Make sure our stack cookie is still with us
 	assert(cookie == 0xfeedface);
-
+	//cprintf("sfsfsfsfsfsfsfsfsf\n");
 	*argsp = NULL;	// recovery mechanism not needed anymore
 }
 
