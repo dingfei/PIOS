@@ -60,7 +60,25 @@ pmap_init(void)
 		// Since these page mappings never change on context switches,
 		// we can also mark them global (PTE_G) so the processor
 		// doesn't flush these mappings when we reload the PDBR.
-		panic("pmap_init() not implemented");
+		
+		// panic("pmap_init() not implemented");
+		
+		uint32_t va;
+
+		for(va = VM_USERLO; va < VM_USERHI; va += PTSIZE){
+			pmap_bootpdir[PDX(va)] = (PTE_ZERO & 0xffc00000) | PTE_P | PTE_W | PTE_PS;
+		}
+			
+		for(va = 0; va < VM_USERLO; va += PTSIZE){
+			pmap_bootpdir[PDX(va)] = (va & 0xffc00000) | PTE_P | PTE_W | PTE_PS | PTE_G;
+		}
+
+		for(va = VM_USERHI; va < 0xffffffff; va += PTSIZE){
+			pmap_bootpdir[PDX(va)] = (va & 0xffc00000) | PTE_P | PTE_W | PTE_PS | PTE_G;
+		}
+
+
+		
 	}
 
 	// On x86, segmentation maps a VA to a LA (linear addr) and
