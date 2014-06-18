@@ -95,6 +95,10 @@ proc_alloc(proc *p, uint32_t cn)
 
 	if (p)
 		p->child[cn] = cp;
+
+	cp->pdir = pmap_newpdir();
+	cp->rpdir = pmap_newpdir();
+	
 	return cp;
 }
 

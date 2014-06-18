@@ -62,21 +62,21 @@ pmap_init(void)
 		// doesn't flush these mappings when we reload the PDBR.
 		
 		// panic("pmap_init() not implemented");
+
 		
 		uint32_t va;
+		int i;
 
-		for(va = VM_USERLO; va < VM_USERHI; va += PTSIZE){
-			pmap_bootpdir[PDX(va)] = (PTE_ZERO & 0xffc00000) | PTE_P | PTE_W | PTE_PS;
+		for(i = 0, va = 0; i < 1024; i++, va += PTSIZE){
+			if(va >= VM_USERLO && va < VM_USERHI){
+				pmap_bootpdir[i] = PTE_ZERO | PTE_P | PTE_W | PTE_PS;
+				cprintf("pmap_bootpdir[%d] = %x\n", i, pmap_bootpdir[i]);
+			}
+			else{
+				pmap_bootpdir[i] = va | PTE_P | PTE_W | PTE_PS | PTE_G;
+				cprintf("pmap_bootpdir[%d] = %x\n", i, pmap_bootpdir[i]);
+			}
 		}
-			
-		for(va = 0; va < VM_USERLO; va += PTSIZE){
-			pmap_bootpdir[PDX(va)] = (va & 0xffc00000) | PTE_P | PTE_W | PTE_PS | PTE_G;
-		}
-
-		for(va = VM_USERHI; va < 0xffffffff; va += PTSIZE){
-			pmap_bootpdir[PDX(va)] = (va & 0xffc00000) | PTE_P | PTE_W | PTE_PS | PTE_G;
-		}
-
 
 		
 	}
@@ -102,7 +102,10 @@ pmap_init(void)
 	uint32_t cr0 = rcr0();
 	cr0 |= CR0_PE|CR0_PG|CR0_AM|CR0_WP|CR0_NE|CR0_TS|CR0_MP|CR0_TS;
 	cr0 &= ~(CR0_EM);
+
+	cprintf("before lcr0\n");
 	lcr0(cr0);
+	cprintf("after lcr0\n");
 
 	// If we survived the lcr0, we're running with paging enabled.
 	// Now check the page table management functions below.
@@ -370,8 +373,10 @@ va2pa(pde_t *pdir, uintptr_t va)
 void
 pmap_check(void)
 {
-	extern pageinfo *mem_freelist;
 
+	cprintf("into pmap_check()\n");
+	extern pageinfo *mem_freelist;
+   
 	pageinfo *pi, *pi0, *pi1, *pi2, *pi3;
 	pageinfo *fl;
 	pte_t *ptep, *ptep1;
