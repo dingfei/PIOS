@@ -69,12 +69,12 @@ pmap_init(void)
 
 		for(i = 0, va = 0; i < 1024; i++, va += PTSIZE){
 			if(va >= VM_USERLO && va < VM_USERHI){
-				pmap_bootpdir[i] = PTE_ZERO | PTE_P | PTE_W | PTE_PS;
-				cprintf("pmap_bootpdir[%d] = %x\n", i, pmap_bootpdir[i]);
+				pmap_bootpdir[i] = PTE_ZERO;
+				//cprintf("pmap_bootpdir[%d] = %x\n", i, pmap_bootpdir[i]);
 			}
 			else{
 				pmap_bootpdir[i] = va | PTE_P | PTE_W | PTE_PS | PTE_G;
-				cprintf("pmap_bootpdir[%d] = %x\n", i, pmap_bootpdir[i]);
+				//cprintf("pmap_bootpdir[%d] = %x\n", i, pmap_bootpdir[i]);
 			}
 		}
 
@@ -182,7 +182,57 @@ pmap_walk(pde_t *pdir, uint32_t va, bool writing)
 	assert(va >= VM_USERLO && va < VM_USERHI);
 
 	// Fill in this function
-	return NULL;
+
+	pde_t* pde;
+	pte_t* pte;
+
+	pde = &pdir[PDX(va)];
+
+	if(*pde == PTE_ZERO){
+		if(writing == 0)
+			return NULL;
+		else{
+			pageinfo* pi = mem_alloc();
+			
+			if(pi== NULL){
+				return NULL;}
+			
+			memset(pi, 0 ,sizeof(PAGESIZE));
+			mem_incref(pi);
+			pte = (pte_t*)(mem_pi2ptr(pi));
+			int i = 0;
+
+			
+			for(; i < NPTENTRIES; i++){
+				pte[i] = PTE_ZERO;
+			}
+
+
+			*pde = mem_phys(pte) | PTE_P | PTE_W | PTE_U; 
+
+			//cprintf("new *pde = %x\n", *pde);
+			
+			
+	
+		}
+	}
+	else{
+		if(writing != 0){
+			/*
+			pgtab = (pte_t*)(PTADDR(*pde));
+			pageinfo* page_table;
+			memcpy(page_table, pgtab, sizeof(PAGESIZE));
+			*pde |= PTE_W;
+			*/
+		}
+		
+		pte = (pte_t*)PGADDR(*pde);
+		
+		//pte[PTX(va)] |= PTE_U;
+	}
+
+
+	return &pte[PTX(va)];
 }
 
 //
@@ -192,7 +242,7 @@ pmap_walk(pde_t *pdir, uint32_t va, bool writing)
 //
 // Requirements
 //   - If there is already a page mapped at 'va', it should be pmap_remove()d.
-//   - If necessary, allocate a page able on demand and insert into 'pdir'.
+//   - If necessary, allocate a page table on demand and insert into 'pdir'.
 //   - pi->refcount should be incremented if the insertion succeeds.
 //   - The TLB must be invalidated if a page was formerly present at 'va'.
 //
@@ -210,7 +260,45 @@ pte_t *
 pmap_insert(pde_t *pdir, pageinfo *pi, uint32_t va, int perm)
 {
 	// Fill in this function
-	return NULL;
+
+	// get pte from pdir
+	
+	//cprintf("in insert pi: %p, pi->refcount = %d\n", pi, pi->refcount);
+
+	pte_t* pte = pmap_walk(pdir, va, 1);
+
+
+	if(pte == NULL)
+		return NULL;
+
+
+	// if pte has been mapped
+	if(*pte != PTE_ZERO){
+		// if va has mapped to another pi, remove that pi 
+		if(PGADDR(*pte) != mem_pi2phys(pi)){
+			cprintf("in remove\n");
+			uint32_t vap = va & ~PAGESHIFT;
+			pmap_remove(pdir, vap, PAGESIZE);
+		}
+		// if va has mapped to the pi that we want to map
+		else{
+			//mem_incref(pi);
+			//cprintf("---------------\n");
+			*pte |= perm;
+			return pte;
+		}
+	}
+
+	// if pte is null, map it
+	
+	*pte = mem_pi2phys(pi) | perm | PTE_P;
+	mem_incref(pi);
+
+
+	//cprintf("out insert pi: %p, pi->refcount = %d\n", pi, pi->refcount);
+	
+	return pte;
+	
 }
 
 //
@@ -241,6 +329,52 @@ pmap_remove(pde_t *pdir, uint32_t va, size_t size)
 	assert(size <= VM_USERHI - va);
 
 	// Fill in this function
+
+	pte_t* pte;
+	pageinfo* pi;
+
+	uint32_t count = size/PAGESIZE;
+
+
+	uint32_t i = 0;
+	uint32_t start = va;
+
+	bool flag_4M = false;
+
+	for(; i < count; i++, start += PAGESIZE){ 
+		//cprintf("start = %x\n", start);
+
+		if(PTOFF(start) == 0x0){
+			cprintf("va start at n * 4M, va = %x\n", start);
+			flag_4M = true;
+		}
+		
+		pte = pmap_walk(pdir, start, 0);
+		
+		if((*pte != PTE_ZERO) && (pte != NULL)){
+			cprintf("act delete\n");	
+			pi = mem_phys2pi(PGADDR(*pte));
+			mem_decref(pi, mem_free);
+			*pte = PTE_ZERO;
+		}
+
+		//cprintf("flag_4M = %d, va = %x\n", flag_4M, start);
+
+		if((PTOFF(start) == 0x3ff000) && flag_4M){
+			cprintf("=======delete PDE\n");
+			flag_4M = false;
+			pde_t* pde = &pdir[PDX(start)];
+			if(*pde != PTE_ZERO){
+				pageinfo* pi = mem_phys2pi(PGADDR(*pde));
+				mem_decref(pi, mem_free);
+				*pde = PTE_ZERO;
+			}
+		}
+
+	}
+
+	
+	
 }
 
 //
@@ -405,14 +539,18 @@ pmap_check(void)
 
 	// free pi0 and try again: pi0 should be used for page table
 	mem_free(pi0);
+
 	assert(pmap_insert(pmap_bootpdir, pi1, VM_USERLO, 0) != NULL);
 	assert(PGADDR(pmap_bootpdir[PDX(VM_USERLO)]) == mem_pi2phys(pi0));
 	assert(va2pa(pmap_bootpdir, VM_USERLO) == mem_pi2phys(pi1));
+
+
 	assert(pi1->refcount == 1);
 	assert(pi0->refcount == 1);
 
 	// should be able to map pi2 at VM_USERLO+PAGESIZE
 	// because pi0 is already allocated for page table
+
 	assert(pmap_insert(pmap_bootpdir, pi2, VM_USERLO+PAGESIZE, 0));
 	assert(va2pa(pmap_bootpdir, VM_USERLO+PAGESIZE) == mem_pi2phys(pi2));
 	assert(pi2->refcount == 1);
@@ -498,6 +636,7 @@ pmap_check(void)
 	assert(mem_alloc() == pi2);
 
 	// now use a pmap_remove on a large region to take pi0 back
+	cprintf("===================wrong here:\n");
 	pmap_remove(pmap_bootpdir, VM_USERLO, VM_USERHI-VM_USERLO);
 	assert(pmap_bootpdir[PDX(VM_USERLO)] == PTE_ZERO);
 	assert(pi0->refcount == 0);
