@@ -163,6 +163,11 @@ trap(trapframe *tf)
 			break;
 		case T_IRQ0 + IRQ_SPURIOUS:
 			panic(" IRQ_SPURIOUS ");
+		case T_PGFLT:
+			if(spinlock_holding(&cons_lock))
+				spinlock_release(&cons_lock);
+			trap_print(tf);
+			panic(" Page Fault ");
 
 		default:
 			proc_ret(tf, -1);

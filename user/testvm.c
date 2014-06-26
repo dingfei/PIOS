@@ -148,7 +148,12 @@ void
 loadcheck()
 {
 	// Simple ELF loading test: make sure bss is mapped but cleared
+
+	cprintf("testvm: in loadcheck\n");
+	
 	uint8_t *p;
+	cprintf("\n========edata is %p, end is %p\n", edata, end);
+	
 	for (p = edata; p < end; p++) {
 		if (*p != 0) cprintf("%x %d\n", p, *p);
 		assert(*p == 0);

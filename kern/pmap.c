@@ -109,8 +109,9 @@ pmap_init(void)
 
 	// If we survived the lcr0, we're running with paging enabled.
 	// Now check the page table management functions below.
-	if (cpu_onboot())
+	if (cpu_onboot()){
 		pmap_check();
+	}
 }
 
 //
@@ -276,7 +277,7 @@ pmap_insert(pde_t *pdir, pageinfo *pi, uint32_t va, int perm)
 	if(*pte != PTE_ZERO){
 		// if va has mapped to another pi, remove that pi 
 		if(PGADDR(*pte) != mem_pi2phys(pi)){
-			cprintf("in remove\n");
+			//cprintf("in remove\n");
 			uint32_t vap = va & ~PAGESHIFT;
 			pmap_remove(pdir, vap, PAGESIZE);
 		}
@@ -345,14 +346,14 @@ pmap_remove(pde_t *pdir, uint32_t va, size_t size)
 		//cprintf("start = %x\n", start);
 
 		if(PTOFF(start) == 0x0){
-			cprintf("va start at n * 4M, va = %x\n", start);
+			//cprintf("va start at n * 4M, va = %x\n", start);
 			flag_4M = true;
 		}
 		
 		pte = pmap_walk(pdir, start, 0);
 		
 		if((*pte != PTE_ZERO) && (pte != NULL)){
-			cprintf("act delete\n");	
+			//cprintf("act delete\n");	
 			pi = mem_phys2pi(PGADDR(*pte));
 			mem_decref(pi, mem_free);
 			*pte = PTE_ZERO;
@@ -361,7 +362,7 @@ pmap_remove(pde_t *pdir, uint32_t va, size_t size)
 		//cprintf("flag_4M = %d, va = %x\n", flag_4M, start);
 
 		if((PTOFF(start) == 0x3ff000) && flag_4M){
-			cprintf("=======delete PDE\n");
+			//cprintf("=======delete PDE\n");
 			flag_4M = false;
 			pde_t* pde = &pdir[PDX(start)];
 			if(*pde != PTE_ZERO){
@@ -371,9 +372,9 @@ pmap_remove(pde_t *pdir, uint32_t va, size_t size)
 			}
 		}
 
-	}
+		pmap_inval(pdir, start, PAGESIZE);
 
-	
+	}
 	
 }
 
@@ -626,6 +627,7 @@ pmap_check(void)
 	pmap_insert(pmap_bootpdir, pi1, VM_USERLO, 0);
 	assert(pi1->refcount == 1);
 	assert(*(int*)VM_USERLO == 0x01010101);
+	//cprintf("===================wrong here:\n");
 	pmap_insert(pmap_bootpdir, pi2, VM_USERLO, 0);
 	assert(*(int*)VM_USERLO == 0x02020202);
 	assert(pi2->refcount == 1);
@@ -636,7 +638,7 @@ pmap_check(void)
 	assert(mem_alloc() == pi2);
 
 	// now use a pmap_remove on a large region to take pi0 back
-	cprintf("===================wrong here:\n");
+	//cprintf("===================wrong here:\n");
 	pmap_remove(pmap_bootpdir, VM_USERLO, VM_USERHI-VM_USERLO);
 	assert(pmap_bootpdir[PDX(VM_USERLO)] == PTE_ZERO);
 	assert(pi0->refcount == 0);

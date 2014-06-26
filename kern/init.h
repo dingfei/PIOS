@@ -20,6 +20,7 @@
 // Called on each processor to initialize the kernel.
 void init(void);
 
+
 // First function run in user mode (only on one processor)
 void user(void);
 

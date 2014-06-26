@@ -108,7 +108,7 @@ proc_ready(proc *p)
 {
 	//panic("proc_ready not implemented");
 
- 	//cprintf("in ready, child num:%d\n", queue.count);
+ 	cprintf("proc %p is in ready, cur cpu is %d\n", p, cpu_cur()->id);
 	if(p == NULL)
 		panic("proc_ready's p is null!");
 	
@@ -272,7 +272,7 @@ proc_run(proc *p)
 {
 	//panic("proc_run not implemented");
 
-	//cprintf("proc %x is running on cpu:%d\n", p, cpu_cur()->id);
+	cprintf("proc %x is running on cpu:%d\n", p, cpu_cur()->id);
 	
 	if(p == NULL)
 		panic("proc_run's p is null!");
@@ -290,7 +290,7 @@ proc_run(proc *p)
 	//proc_print(RELEASE, p);
 	spinlock_release(&p->lock);
 
-	//cprintf("eip = %d\n", p->sv.tf.eip);
+	cprintf("eip = %x\n", p->sv.tf.eip);
 	
 	trap_return(&p->sv.tf);
 	

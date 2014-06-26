@@ -33,6 +33,9 @@
 // User-mode stack for user(), below, to run on.
 static char gcc_aligned(16) user_stack[PAGESIZE];
 
+void elf_binary_loader(char* elf, pde_t* pdir);
+
+
 // Lab 3: ELF executable containing root process, linked into the kernel
 #ifndef ROOTEXE_START
 #define ROOTEXE_START _binary_obj_user_testvm_start
@@ -89,7 +92,6 @@ init(void)
 		cpu_onboot() ? "BP" : "AP");
 
 
-
 	// Lab 1: change this so it enters user() in user mode,
 	// running on the user_stack declared above,
 	// instead of just calling user() directly.
@@ -112,6 +114,7 @@ init(void)
 	trap_return(&tt);
 	*/
 
+	/*
 	if(cpu_onboot()){
 		proc_root = proc_alloc(&proc_null, 0);
 		proc_root->sv.tf.eip = (uint32_t)(user);
@@ -123,11 +126,144 @@ init(void)
 
 		proc_ready(proc_root);	
 	}
+	*/
+
+	
+	if(cpu_onboot()){
+		proc_root = proc_alloc(&proc_null, 0);
+		elf_binary_loader(ROOTEXE_START, proc_root->pdir);
+		memset(mem_ptr(VM_USERHI - PAGESIZE), 0, PAGESIZE);
+		proc_root->sv.tf.eip = (uint32_t)(0x40000100);
+		proc_root->sv.tf.esp = (uint32_t)(VM_USERHI -1);
+		proc_root->sv.tf.eflags = FL_IOPL_3;
+		proc_root->sv.tf.gs = CPU_GDT_UDATA | 3;
+		proc_root->sv.tf.fs = CPU_GDT_UDATA | 3;
+
+		pte_t* pte = pmap_walk(proc_root->pdir, 0x40000100, 0);
+		cprintf("0x40000100's pte is %x @ %p\n", *pte, pte);
+
+		proc_ready(proc_root);	
+	}
 
 	
 	proc_sched();
 
 	//user();
+}
+
+
+void
+elf_binary_loader(char* elf, pde_t* pdir)
+{
+	cprintf("======================elf load begin!\n");
+
+	elfhdr* eh = (elfhdr*)elf;
+	
+	sechdr* sh_start = (sechdr*)(elf + eh->e_shoff);
+	uint16_t shnum = eh->e_shnum;
+	uint16_t i = 0;
+	sechdr* sh = sh_start;
+
+	lcr3(mem_phys(pdir));
+
+	// first, alloc pages for each sections according to the section header
+	//cprintf("tag1=======================\n", i);
+
+	for(; i < shnum; i++, sh++){
+		//cprintf("i = %d =======================\n", i);
+			if ((sh->sh_type != ELF_SHT_PROGBITS) &&
+					(sh->sh_type != ELF_SHT_NOBITS)) {
+						continue;
+			}
+			
+			if (sh->sh_addr == 0x0) {
+				continue;
+			}
+
+		uint32_t va_start_page = sh->sh_addr & ~0xfff;
+		uint32_t va_end_page = (sh->sh_addr + sh->sh_size) & ~0xfff;
+		uint32_t va = va_start_page;
+
+		cprintf("va_start_page = %x, va_end_page = %x\n", va_start_page, va_end_page);
+
+		for(; va <= va_end_page; va += PAGESIZE){
+			cprintf("va = %x\n", va);
+			if(!pmap_insert(pdir, mem_alloc(), va, PTE_W | PTE_U))
+				panic("in elf loader: pmap_insert failed!\n");
+		}
+	}
+
+	//then, write data into pages according to the context of the sections
+	//cprintf("tag2=======================\n", i);
+
+	sh = sh_start;
+	i = 0;
+	for(; i < shnum; i++, sh++){
+		if ((sh->sh_type != ELF_SHT_PROGBITS) &&
+				(sh->sh_type != ELF_SHT_NOBITS)) {
+					continue;
+		}
+			
+		if (sh->sh_addr == 0x0) {
+			continue;
+		}
+		
+		uint32_t sec_start = (uint32_t)elf + sh->sh_offset;
+		uint32_t sec_size = sh->sh_size;
+		uint32_t va_start = sh->sh_addr;
+		
+		if(sh->sh_type == ELF_SHT_PROGBITS)
+			memcpy((char*)va_start, (char*)sec_start, sec_size);
+		else 
+			memset((char*)va_start, 0, sec_size);
+	}
+
+	//last, set flags correctly to each page
+	//cprintf("tag3=======================\n", i);
+
+	sh = sh_start;
+	i = 0;
+	for(; i < shnum; i++, sh++){
+		//cprintf("in tag3 i = %d\n", i);
+		if ((sh->sh_type != ELF_SHT_PROGBITS) &&
+				(sh->sh_type != ELF_SHT_NOBITS)) {
+					continue;
+		}
+			
+		if (sh->sh_addr == 0x0) {
+			continue;
+		}
+
+
+		// if this section is Read-Only
+		if(!(sh->sh_flags & ELF_SHF_WRITE)){
+			uint32_t va_start_page = sh->sh_addr & ~0xfff;
+			uint32_t va_end_page = (sh->sh_addr + sh->sh_size) & ~0xfff;
+			uint32_t va = va_start_page;
+			
+			pte_t* pte;
+
+			for(; va <= va_end_page; va += PAGESIZE){
+				pte = pmap_walk(pdir, va, 0);
+
+				if(!pte)
+					panic("in elf loader: pmap_walk failed!\n");
+
+				*pte &= ~PTE_W;
+			}
+		}
+	}
+
+	//cprintf("tag4=======================\n", i);
+	if(!pmap_insert(pdir, mem_alloc(), VM_USERHI - PAGESIZE, PTE_W | PTE_U | PTE_P))
+		panic("in elf loader: STACK alloc failed!\n");
+
+	
+
+	cprintf("==================elf load done!\n");
+
+	return;
+
 }
 
 // This is the first function that gets run in user mode (ring 3).
